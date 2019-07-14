@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/distatus/battery"
+	"github.com/odsod/bspwmrc/internal/battery"
 	"github.com/odsod/bspwmrc/internal/bspc"
 	"github.com/odsod/bspwmrc/internal/childprocess"
 	"github.com/odsod/bspwmrc/internal/notify"
@@ -132,6 +132,21 @@ func toggleScratchpad(logger *log.Logger, name string) {
 
 func cron(logger *log.Logger) {
 	logger.Printf("cron")
+	bs, err := battery.LoadAll()
+	if err != nil {
+		panic(err)
+	}
+	for _, b := range bs {
+		if b.Charge() < 0.1 {
+			if err := notify.Send(
+				fmt.Sprintf("%s charge", b.Name),
+				fmt.Sprintf("%.2f%%", b.Charge()*100),
+				2*time.Second,
+			); err != nil {
+				panic(err)
+			}
+		}
+	}
 }
 
 func run(logger *log.Logger) {
@@ -161,13 +176,13 @@ func clock(logger *log.Logger) {
 
 func batteryCharge(logger *log.Logger) {
 	logger.Printf("battery-charge")
-	batteries, err := battery.GetAll()
+	batteries, err := battery.LoadAll()
 	if err != nil {
 		panic(err)
 	}
 	var buf bytes.Buffer
-	for i, b := range batteries {
-		if _, err := fmt.Fprintf(&buf, "Battery %d: %s %.2f%%\n", i, b.State, b.Current/b.Full*100); err != nil {
+	for _, b := range batteries {
+		if _, err := fmt.Fprintf(&buf, "%s %s:\n%.2f%%\n", b.Name, b.Status, b.Charge()*100); err != nil {
 			panic(err)
 		}
 	}
